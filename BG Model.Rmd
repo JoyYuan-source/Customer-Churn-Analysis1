@@ -166,4 +166,4 @@ ggplot(rentention,aes(x=X,y=Y))%>%
   + scale_x_continuous("Months", limits=c(1,12), breaks=1:12)
 ```
 Managerial explanation of why the retention curve has the shape:
-The retention curve shows an increasing retention rates from month 1 to month 12, and the speed of the increasing trend slows down as time goes by. The reason why the retention rate goes up rapidly at an earlier period can be the customers who are more likely to leave the market churn at each month. While the majority "churn" customers leaves the market, the remaining customers are more likely to stay, so the retention rate increasing speed slows down.  
+The retention curve shows an increasing retention rates from month 1 to month 12, and the speed of the increasing trend slows down as time goes by. The reason why the retention rate goes up rapidly at an earlier period can be the customers who are more likely to leave the market churn at each month. While the majority "risky" customers leaves the market, the remaining customers are more likely to stay, so the retention rate increasing speed slows down.  
