@@ -1,0 +1,169 @@
+---
+title: "APM_Homework1</font>"
+author: "*Group24*"
+date: "*1/17/2020*"
+output:
+  html_notebook:
+    theme: journal
+    highlight: zenburn
+editor_options:
+  chunk_output_type: inline
+      
+  
+---
+
+</br></br>
+*<font size="5">Step1: Import the data </font>*
+```{r}
+customer <- read.table("./getfit.txt",head=TRUE)
+```
+</br></br>
+*<font size="5">Step2: Clean data </font>*
+</br>
+We suppose no matter when a customer come, the theta Obeys Beta distribution.
+```{r,include=FALSE}
+library(dplyr)
+library(ggplot2)
+```
+
+
+```{r}
+#calculate duration: when last is NA, means duration is 9-fist
+end_month <- 8L
+customer <- customer %>% mutate(duration=case_when(is.na(last)==FALSE~last-first+1L,
+                                              is.na(last)==TRUE~end_month-first+1L),
+                                S=case_when(is.na(last)==FALSE~1,
+                                            is.na(last)==TRUE~0))
+```
+
+*<font size="5">Question1: Build BG model and estimate coefficients </font>*
+```{r}
+#Define P and S function
+log_P <- function(t, a, b) {
+lbeta(a+1, b+t-1) - lbeta(a, b)
+}
+log_S <- function(t, a, b) {
+lbeta(a, b+t) - lbeta(a,b)
+}
+
+#Log likelihood fuction in Bg model
+LL_BG <- function(pars, N,S) {
+a <- exp(pars[1])
+b <- exp(pars[2])
+LL_all <- sum(S*log_P(N,a,b) + (1-S)*log_S(N,a,b))
+return(-LL_all) ## scalar
+}
+
+#search the largest likelihood coeffiencts
+N=customer[["duration"]]
+S=customer[["S"]]
+start <- c(0,0)
+opt_BG <- optim(start,fn=LL_BG,N=N,S=S)
+
+## inverse transform of (log a, log b) back to (a,b)
+a <- exp(opt_BG[["par"]][1])
+b <- exp(opt_BG[["par"]][2])
+
+LL <- -opt_BG[["value"]]
+c(a,b)
+LL_BG(log(c(a,b)), N=N, S=S)
+
+#convert LL to probability 
+invlogit <- function(z) exp(z)/(1+exp(z))
+invlogit(-3602.33)
+
+# estimate mean churn probability distribution: 
+a/(a+b)
+
+#estimate variance of churn probability distribution: 
+(a*b)/((a+b)^2*(a+b+1))
+```
+
+```{r}
+#The shape of the churn probability distribution
+logit <- function(theta) log(theta)-log(1-theta)
+ggplot(tibble(theta=c(.01,.99)), aes(x=theta)) %>% + stat_function(fun=dbeta, args=list(shape1=a,shape2=b), geom="line",colour='blue') %>% + scale_x_continuous(expression(theta), breaks=c((0:4)/4,a/(a+b))) %>% + scale_y_continuous(expression(g(theta))) %>% + geom_vline(xintercept=a/(a+b),linetype=3) %>% + theme_bw() %>% + theme(axis.text.y=element_blank()) 
+```
+*<font size="5">Explanation:</font>*
+</br>
+- the LL of MLE is -3602.33 with the parameters a = 0.83 and b = 1.56.
+- The mean and variance of the churn probability distribution are 0.346 and 0.067. 
+- With parameter a < 1 and b > 1, The shape of the distribution is L-shaped. 
+- This shape shows that mean churn probability is smaller than 0.5, and most people choose to stay. 
+
+The mathematical calculation is provided below:
+$$
+E({\theta}) = \frac{a}{a+b}\ = \frac{0.829}{0.829+1.565}\ = 0.346\\\\
+Var({\Theta}) =\frac{ab}{(a+b)^2(a+b+1)} = \frac{0.829*1.565}{(0.829+1.565)^2*(0.829+1.565+1)} = 0.067
+$$
+</br></br>
+*<font size="5">Question2: Consider a randomly-chosen member of the population who was newly acquired in January.</font>*
+</br>
+What is the estimated probability that this customer will cancel service after only one month? 
+
+The probabitily a customer will cancel service after one month is $$P(T=1 \mid a,b)=\frac{B(a+1,b+t-1)}{B(a+b)}\ = \frac{B(0.829+1,1.565+1-1)}{B(0.829+1.565)}=0.346$$
+
+```{r}
+exp(log_P(1,a,b))
+```
+
+What is the expected probability that this customer will cancel service after two months? 
+
+The probabitily a customer will cancel service after two month is $$P(T=2 \mid a,b)=\frac{B(a+1,b+t-1)}{B(a+b)}\ = \frac{B(0.829+1,1.565+2-1)}{B(0.829+1.565)}=0.160$$
+
+```{r}
+exp(log_P(2,a,b))
+
+```
+
+What is the probability this customer is still active?
+
+The probabitily a customer is still alive is $$S(8 \mid a,b)=\frac{B(a,b+t)}{B(a,b)}\ = \frac{B(0.829,1.565+8)}{B(0.829,1.565)}=0.215$$
+
+
+```{r}
+exp(log_S(8,a,b))
+```
+</br></br>
+*<font size="5">Question3: Create a table of the predicted number of these customers who are active in each month, through next June.</font>* 
+</br>
+
+Predicted survivor = $800*S(t \mid a,b)=800*\frac{B(a,b+t)}{B(a,b)}$
+
+```{r results="hide"}
+#generize month name
+month <- seq.Date(from = as.Date("2019/09/01",format = "%Y/%m/%d"), by = "month", length.out = 10)
+month <- format(month, format= '%b')
+t=1:length(month)
+N0=800
+library(kableExtra)
+
+```
+
+```{r}
+y <- tibble(month,Active_number=round(N0*exp(lbeta(a,b+t-1)-lbeta(a,b))))
+y %>% kable(digits=c(1,1,1), booktabs = TRUE, align=rep("c",3))
+```
+
+</br></br>
+*<font size="5">Question 4. Plot the estimated retention curve for this population for 12 months.</font>*  
+</br>
+Retention rate in BG model: $r(t \mid a,b) = \frac{B(a,b+t)}{B(a,b+t-1)}$
+```{r}
+rentention=tibble(X=1L:12L,
+                  Y=exp(lbeta(a,b+X-1)-lbeta(a,b))/exp(lbeta(a,b+X-2)-lbeta(a,b)))
+```
+
+
+```{r,echo=FALSE}
+ggplot(rentention,aes(x=X,y=Y))%>%
+  +geom_line(size=1.1,linetype = 'dashed', color='Blue')%>%
+  +geom_point()%>%
+  + scale_y_continuous() %>%
+  + labs(title = "Retention curve",x='Months',y="Retention Rates") %>%
+  + theme_gray() %>%
+  + theme(panel.grid.minor=element_blank(), plot.title = element_text(hjust = 0.5)) %>%
+  + scale_x_continuous("Months", limits=c(1,12), breaks=1:12)
+```
+Managerial explanation of why the retention curve has the shape:
+The retention curve shows an increasing retention rates from month 1 to month 12, and the speed of the increasing trend slows down as time goes by. The reason why the retention rate goes up rapidly at an earlier period can be the customers who are more likely to leave the market churn at each month. While the majority "churn" customers leaves the market, the remaining customers are more likely to stay, so the retention rate increasing speed slows down.  
