@@ -1,6 +1,6 @@
 ---
-title: "APM_Homework1</font>"
-author: "*Group24*"
+title: "Customer Churn Analysis1</font>"
+author: "*Amazing*"
 date: "*1/17/2020*"
 output:
   html_notebook:
